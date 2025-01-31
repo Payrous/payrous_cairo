@@ -128,7 +128,7 @@ mod Payrous {
 
 
         fn add_multiple_employees(ref self: ContractState, employees: Array<ContractAddress>, amounts: Array<u256>) {
-            _checkOwner();
+            self._checkOwner();
             assert(employees.len() == amounts.len(), errors::INVALID_LENGTH);
             assert(employees.len() <= self.max_employees.read(), errors::MAX_EMPLOYEE);
         
@@ -165,7 +165,7 @@ mod Payrous {
 
 
         fn add_employee(ref self: ContractState, employee: ContractAddress, amount: u256) {
-            _checkOwner();
+            self._checkOwner();
             assert(!employee.is_zero(), errors::INVALID_ADDRESS);
             assert(amount != 0, errors::INVALID_AMOUNT);
             assert(self.employeeExists.entry(employee).read() == false, errors::EMPLOYEE_ALREADY_EXIST);
@@ -191,7 +191,7 @@ mod Payrous {
 
 
         fn remove_employee(ref self: ContractState, employee: ContractAddress) {
-            _checkOwner();
+            self._checkOwner();
             assert(!employee.is_zero(), errors::INVALID_ADDRESS);
             assert(self.employeeExists.entry(employee).read(), errors::EMPLOYEE_NOT_FOUND);
         
@@ -325,7 +325,7 @@ mod Payrous {
         }
 
         fn update_payment_token(ref self: ContractState, token_address: ContractAddress) {
-            _checkOwner();
+            self._checkOwner();
             assert(!token_address.is_zero(), errors::INVALID_ADDRESS);
             let mut current_details = self.organizationDetails.read();
             current_details.token_address = token_address;

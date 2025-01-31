@@ -80,7 +80,6 @@ pub mod Payrous_factory {
         index: u32,
     }  
 
-
     #[constructor]
     fn constructor(ref self: ContractState, _owner: ContractAddress, _payrous_class_hash: felt252) {
         self.owner.write(_owner);
