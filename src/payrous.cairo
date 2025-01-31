@@ -1,13 +1,10 @@
-/// Interface representing `HelloContract`.
-/// This interface allows modification and retrieval of the contract balance.
-/// 
 use starknet::ContractAddress;
 use core::starknet::storage;
 use payrous_starknet::types::OrganizationDetails;
 
 
 #[starknet::interface]
-pub trait IPyarous<TContractState> {
+pub trait IPayrous<TContractState> {
     // Write functions
     fn initialize(ref self: TContractState, organization_name: felt252, token_address: ContractAddress, owner: ContractAddress, platform_fee_recipient: ContractAddress);
     fn add_multiple_employees(ref self: TContractState, employees: Array<ContractAddress>, amounts: Array<u256>);
@@ -19,15 +16,15 @@ pub trait IPyarous<TContractState> {
     fn update_payment_token(ref self: TContractState, token_address: ContractAddress); 
     fn withdraw_locked_funds(ref self: TContractState, token_address: ContractAddress);
     fn update_platform_fee(ref self: TContractState, platform_fee: u256);
-    fn transfer_native_funds(ref self: TContractState);
 
     // view functions
     fn get_organization_details(self: @TContractState) -> OrganizationDetails;
-    fn get_employee_details(self: @TContractState, employee: ContractAddress) -> (u256, u256, u256);
+    fn get_employee_details(self: @TContractState, employee: ContractAddress) -> (u256, u64, u64);
     fn get_all_employee_address(self: @TContractState) -> Array<ContractAddress>;
     fn get_employee_count(self: @TContractState) -> u256;
     fn get_employee_balance(self: @TContractState, employee: ContractAddress) -> u256;
     fn get_contract_balance(self: @TContractState) -> u256;
+    fn get_full_details(self: @TContractState) -> (OrganizationDetails, Array<ContractAddress>, Array<u256>);
 }
 
 #[starknet::interface]
@@ -42,7 +39,7 @@ pub trait IERC20<TContractState> {
 
 #[starknet::contract]
 mod Payrous {
-    use super::IPyarous;
+    use super::IPayrous;
     use core::array::ArrayTrait;
     use starknet::ContractAddress;
     use starknet::storage::{Map, StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, StorageMapReadAccess, StorageMapWriteAccess};  
@@ -52,6 +49,7 @@ mod Payrous {
     use core::num::traits::Zero;
     use payrous_starknet::types::OrganizationDetails;
     use starknet::{get_caller_address, get_contract_address, contract_address_const, get_block_timestamp};
+    use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 
 
     #[storage]
@@ -67,6 +65,7 @@ mod Payrous {
         employee_amounts: Map<u32, u256>,
         employeeIndex: Map<ContractAddress, u32>,
         employeeExists: Map<ContractAddress, bool>,
+        deployed_at: u64,
     }
 
     #[event]
@@ -99,10 +98,8 @@ mod Payrous {
 
 
     #[abi(embed_v0)]
-    impl PayrousImpl of super::IPyarous<ContractState> {
-
+    impl PayrousImpl of super::IPayrous<ContractState> {
         fn initialize(ref self: ContractState, organization_name: felt252, token_address: ContractAddress, owner: ContractAddress, platform_fee_recipient: ContractAddress) {
-
             assert(self.initialized.read() == false, errors::ALREADY_INITIALIZED);
             assert(!token_address.is_zero(), errors::INVALID_ADDRESS);
             self.platform_fee_recipient.write(platform_fee_recipient);
@@ -120,7 +117,8 @@ mod Payrous {
                 payment_interval: 0,
                 start_time: 0,
                 end_time: 0,
-                is_payment_active: false
+                is_payment_active: false,
+                deployed_at: get_block_timestamp()
             };
 
             self.organizationDetails.write(_organizationDetails);
@@ -130,6 +128,7 @@ mod Payrous {
 
 
         fn add_multiple_employees(ref self: ContractState, employees: Array<ContractAddress>, amounts: Array<u256>) {
+            _checkOwner();
             assert(employees.len() == amounts.len(), errors::INVALID_LENGTH);
             assert(employees.len() <= self.max_employees.read(), errors::MAX_EMPLOYEE);
         
@@ -166,6 +165,7 @@ mod Payrous {
 
 
         fn add_employee(ref self: ContractState, employee: ContractAddress, amount: u256) {
+            _checkOwner();
             assert(!employee.is_zero(), errors::INVALID_ADDRESS);
             assert(amount != 0, errors::INVALID_AMOUNT);
             assert(self.employeeExists.entry(employee).read() == false, errors::EMPLOYEE_ALREADY_EXIST);
@@ -191,6 +191,7 @@ mod Payrous {
 
 
         fn remove_employee(ref self: ContractState, employee: ContractAddress) {
+            _checkOwner();
             assert(!employee.is_zero(), errors::INVALID_ADDRESS);
             assert(self.employeeExists.entry(employee).read(), errors::EMPLOYEE_NOT_FOUND);
         
@@ -229,7 +230,7 @@ mod Payrous {
 
 
         fn send_to_employee(ref self: ContractState) {
-            let current_details = self.organizationDetails.read();
+            let mut current_details = self.organizationDetails.read();
             
             // Check end time if it's set
             if current_details.end_time != 0 {
@@ -239,49 +240,35 @@ mod Payrous {
             // Check start time and update interval
             assert(get_block_timestamp() >= current_details.start_time, errors::UNAUTHORIZED);
             
-            let mut updated_details = current_details;
-            updated_details.start_time += current_details.payment_interval;
-            updated_details.is_payment_active = true;
+            // let mut updated_details = current_details;
+            current_details.start_time += current_details.payment_interval;
+            current_details.is_payment_active = true;
             
             // Check if there are employees
             assert(current_details.employees_length > 0, errors::EMPLOYEE_NOT_FOUND);
 
-            // Handle native token (ETH) transfers
-            if current_details.token_address == get_contract_address() {
-                let mut i: u32 = 0;
-                while i < current_details.employees_length {
-                    let recipient = self.organization_employees.read(i);
-                    let amount = self.employee_amounts.read(i);
-                    
-                    // Transfer native tokens
-                    send_eth_transfer(recipient, amount);
-                    
-                    // Emit event
-                    self.emit(NativeTransfer { from: get_caller_address(), to: recipient, amount: amount });
-                    i += 1;
-                }
-            } else {
-                // Handle ERC20 transfers
-                let mut i: u32 = 0;
-                while i < current_details.employees_length {
-                    let recipient = self.organization_employees.read(i);
-                    let amount = self.employee_amounts.read(i);
-                    
-                    // Create ERC20 dispatcher
-                    let token = IERC20Dispatcher{
-                        contract_address: current_details.token_address
-                    };
-                    
-                    // Transfer ERC20 tokens
-                    token.transfer(recipient, amount);
-                    
-                    // Emit event
-                    self.emit(ERC20Transfer { token_address: current_details.token_address, sender: get_caller_address(), to: recipient, amount: amount });  
-                    i += 1;
+         
+            // Handle ERC20 transfers
+            let mut i: u32 = 0;
+            while i < current_details.employees_length {
+                let recipient = self.organization_employees.read(i);
+                let amount = self.employee_amounts.read(i);
+                
+                // Create ERC20 dispatcher
+                let token = IERC20Dispatcher{
+                    contract_address: current_details.token_address
                 };
-            }
+                
+                // Transfer ERC20 tokens
+                token.transfer(recipient, amount);
+                
+                // Emit event
+                self.emit(ERC20Transfer { token_address: current_details.token_address, sender: get_caller_address(), to: recipient, amount: amount });  
+                i += 1;
+            };
+            
             // Update organization details
-            self.organizationDetails.write(updated_details);
+            self.organizationDetails.write(current_details);
         }
 
         fn public_send(
@@ -304,98 +291,126 @@ mod Payrous {
             let platform_fee = (total_amount * self.platform_fee.read()) / 100;
             assert(platform_fee > 0, errors::INVALID_PLATFORM_FEES);
 
-            // Handle native token transfers
-            if token_address == get_contract_address() {
-                // Check sufficient balance was sent
-                let required_amount = total_amount + platform_fee;
-                let sent_value = get_txn_value();
-                assert(sent_value >= required_amount, errors::INSUFFICIENT_BALANCE);
+    
+            // Handle ERC20 transfers
+            let token = IERC20Dispatcher { contract_address: token_address };
+            let caller = get_caller_address();
+            let fee_recipient = self.platform_fee_recipient.read();
 
-                // Transfer platform fee
-                let fee_recipient = self.platform_fee_recipient.read();
-                send_eth_transfer(fee_recipient, platform_fee);
+            // Transfer platform fee
+            token.transfer_from(caller, fee_recipient, platform_fee);
+            
+            self.emit(ERC20Transfer { token_address, sender: caller, to: fee_recipient, amount: platform_fee });
+
+            // Transfer to recipients
+            let mut k: u32 = 0;
+            while k < recipients.len() {
+                let recipient = *recipients[k];
+                let amount = *amounts[k];
                 
-                self.emit(NativeTransfer { from: get_caller_address(), to: fee_recipient, amount: platform_fee});
-
-                // Transfer to recipients
-                let mut j: u32 = 0;
-                while j < recipients.len() {
-                    let recipient = *recipients[j];
-                    let amount = *amounts[j];
-                    
-                    send_eth_transfer(recipient, amount);
-                    
-                    self.emit(NativeTransfer {from: get_caller_address(), to: recipient, amount: amount});
-                    j += 1;
-                };
-
-                // Handle excess refund
-                let excess = sent_value - required_amount;
-                if excess > 0 {
-                    send_eth_transfer(get_caller_address(), excess);
-                }
-            } else {
-                // Handle ERC20 transfers
-                let token = IERC20Dispatcher { contract_address: token_address };
-                let caller = get_caller_address();
-                let fee_recipient = self.platform_fee_recipient.read();
-
-                // Transfer platform fee
-                token.transfer_from(caller, fee_recipient, platform_fee);
+                token.transfer_from(caller, recipient, amount);
                 
-                self.emit(ERC20Transfer { token_address, sender: caller, to: fee_recipient, amount: platform_fee });
-
-                // Transfer to recipients
-                let mut k: u32 = 0;
-                while k < recipients.len() {
-                    let recipient = *recipients[k];
-                    let amount = *amounts[k];
-                    
-                    token.transfer_from(caller, recipient, amount);
-                    
-                    self.emit(ERC20Transfer {token_address, sender: caller, to: recipient, amount });
-                    k += 1;
-                }
+                self.emit(ERC20Transfer {token_address, sender: caller, to: recipient, amount });
+                k += 1;
             }
         }
 
+        fn deposit(ref self: ContractState, amount: u256) {
+            assert(amount != 0, errors::INVALID_AMOUNT);
+            let caller = get_caller_address();
+            let token = IERC20Dispatcher { contract_address: self.organizationDetails.read().token_address };
+            token.transfer_from(caller, get_contract_address(), amount);
+            
+            self.emit(ERC20Transfer { token_address: self.organizationDetails.read().token_address, sender: caller, to: get_contract_address(), amount });
+        }
 
-        // fn d
+        fn update_payment_token(ref self: ContractState, token_address: ContractAddress) {
+            _checkOwner();
+            assert(!token_address.is_zero(), errors::INVALID_ADDRESS);
+            let mut current_details = self.organizationDetails.read();
+            current_details.token_address = token_address;
+            self.organizationDetails.write(current_details);
+        }
+
+        fn withdraw_locked_funds(ref self: ContractState, token_address: ContractAddress) {
+            self._checkOwner();
+            let token = IERC20Dispatcher { contract_address: token_address };
+            let caller = get_caller_address();
+            let total_amount = token.balance_of(get_contract_address());
+            token.transfer(caller, total_amount);
+            self.emit(ERC20Transfer { token_address, sender: get_contract_address(), to: caller, amount: total_amount });
+        }
+
+        fn update_platform_fee(ref self: ContractState, platform_fee: u256) {
+            self._checkOwner();
+            assert(platform_fee > 0, errors::INVALID_PLATFORM_FEES);
+            self.platform_fee.write(platform_fee);
+        }
 
 
+        // read function
+        fn get_organization_details(self: @ContractState) -> OrganizationDetails {
+            self.organizationDetails.read()
+        }
+
+        fn get_employee_details(self: @ContractState, employee: ContractAddress) -> (u256, u64, u64) {
+
+            let employee_index = self.employeeIndex.entry(employee).read();
+            let amount = self.employee_amounts.entry(employee_index).read();
+            let start_time = self.organizationDetails.read().start_time;
+            let payment_interval = self.organizationDetails.read().payment_interval;
+            (amount, start_time, payment_interval)
+        }
+
+        fn get_all_employee_address(self: @ContractState) -> Array<ContractAddress> {
+            let mut employees: Array<ContractAddress> = array![];
+            let mut i: u32 = 0;
+            while i < self.organizationDetails.read().employees_length {
+                employees.append(self.organization_employees.read(i));
+                i += 1;
+            };
+            employees
+        }
 
 
+        fn get_employee_count(self: @ContractState) -> u256 {
+            self.organizationDetails.read().employees_length.into()
+        }
 
+        fn get_employee_balance(self: @ContractState, employee: ContractAddress) -> u256 {
+            let employee_index = self.employeeIndex.entry(employee).read();
+            self.employee_amounts.entry(employee_index).read()
+        }
 
-  
-  
+        fn get_contract_balance(self: @ContractState) -> u256 {
+            let token = IERC20Dispatcher { contract_address: self.organizationDetails.read().token_address };
+            token.balance_of(get_contract_address())
+        }
 
+        fn get_full_details(self: @ContractState) -> (OrganizationDetails, Array<ContractAddress>, Array<u256>) {
+            let organization_details = self.organizationDetails.read();
+            let employees = self.get_all_employee_address();
+            let mut amounts: Array<u256> = array![];
+            let mut i: u32 = 0;
+            while i < organization_details.employees_length {
 
-
-
-
-        // fn increase_balance(ref self: ContractState, amount: felt252) {
-        //     assert(amount != 0, 'Amount cannot be 0');
-        //     self.balance.write(self.balance.read() + amount);
-        // }
-
-        // fn get_balance(self: @ContractState) -> felt252 {
-        //     self.balance.read()
-        // }
+                let employee = *employees[i];
+                let employee_index = self.employeeIndex.entry(employee).read();
+                amounts.append(self.employee_amounts.read(employee_index));
+                i += 1;
+            };
+            (organization_details, employees, amounts)
+        }
     }
+
 
 
     #[generate_trait]
     impl InternalFunctions of InternalFunctionsTrait {
-        // Helper function for ETH transfer
-        fn send_eth_transfer(to: ContractAddress, amount: u256) {
-            let transfer_syscall = starknet::syscalls::send_message_to_l1_syscall(
-                to,
-                array![amount.try_into().unwrap()].span()
-            );
-            assert(transfer_syscall.is_ok(), 'ETH transfer failed');
+        fn _checkOwner(ref self: ContractState) {
+            let caller = get_caller_address();
+            assert(caller == self.owner.read(), errors::UNAUTHORIZED);
         }
-
-
     }
+  
 }
