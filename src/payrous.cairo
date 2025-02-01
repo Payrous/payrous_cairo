@@ -1,5 +1,4 @@
 use starknet::ContractAddress;
-use core::starknet::storage;
 use payrous_starknet::types::OrganizationDetails;
 
 
@@ -43,12 +42,10 @@ mod Payrous {
     use core::array::ArrayTrait;
     use starknet::ContractAddress;
     use starknet::storage::{Map, StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry, StorageMapReadAccess, StorageMapWriteAccess};  
-    use starknet::storage::{StorageBase, FlattenedStorage, StorageTrait, StorageTraitMut};
-    use starknet::storage::StoragePointer;
     use payrous_starknet::errors;
     use core::num::traits::Zero;
     use payrous_starknet::types::OrganizationDetails;
-    use starknet::{get_caller_address, get_contract_address, contract_address_const, get_block_timestamp};
+    use starknet::{get_caller_address, get_contract_address, get_block_timestamp};
     use openzeppelin_token::erc20::interface::{IERC20Dispatcher, IERC20DispatcherTrait};
 
 

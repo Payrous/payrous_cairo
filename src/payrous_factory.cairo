@@ -1,17 +1,16 @@
-use starknet::ContractAddress;
+use starknet::{ContractAddress, ClassHash};
 use payrous_starknet::types::{ContractInfo};
-use core::starknet::storage;
 
 
 #[starknet::interface]
-pub trait Ipayrous_factory<TContractState> {
+pub trait IPayrousFactory<TContractState> {
     //read functions
     fn get_all_deployed_contract(self: @TContractState) -> Array<ContractAddress>;
     fn get_all_deployed_contract_by_user(self: @TContractState, user_address: ContractAddress) -> Array<ContractAddress>;
     fn get_a_contract_details(self: @TContractState, deployed_address: ContractAddress) -> ContractInfo;
     fn get_owner(self: @TContractState) -> ContractAddress;
     fn get_contract_info(self: @TContractState, contract_address: ContractAddress) -> ContractInfo;
-    fn get_class_hash(self: @TContractState) -> felt252;
+    fn get_class_hash(self: @TContractState) -> ClassHash;
 
 
     //write functions
@@ -22,36 +21,30 @@ pub trait Ipayrous_factory<TContractState> {
         owner: ContractAddress, 
         platform_fee_recipient: ContractAddress,
     );
-    fn upgrade_class_hash(ref self: TContractState, new_class_hash: felt252);
+    fn upgrade_class_hash(ref self: TContractState, new_class_hash: ClassHash);
 
 }
 
 
 #[starknet::contract]
-pub mod Payrous_factory {
+pub mod PayrousFactory {
     use starknet::ContractAddress;
-    use starknet::storage;
-    use starknet::constants;
-    use core::num::traits::Zero;
-    use super::ContractAddress;
     use starknet::{
         syscalls::deploy_syscall,
         ClassHash,
         get_caller_address, 
         get_contract_address, 
-        contract_address_const, 
         get_block_timestamp
     };
-    use starknet::Payrous_factory::Ipayrous_factory;
-    use starknet::types::UserDetails;
     use payrous_starknet::types::{ContractInfo};
-    use payrous::{Ipayrous, IpayrousDispatcher, IpayrousDispatcherTrait};
+    use payrous_starknet::payrous::{IPayrousDispatcher,IPayrousDispatcherTrait};
+    use starknet::storage::{Map, StoragePointerReadAccess, StoragePointerWriteAccess, StoragePathEntry};  
 
 
 
 
     #[storage]
-    pub struct Payrous_factory {
+    struct Storage {
         owner: ContractAddress,
         total_deployed_contract: u64,
         total_users: u64,
@@ -59,7 +52,7 @@ pub mod Payrous_factory {
         contract_info: Map<ContractAddress, ContractInfo>,
         user_deployed_tokens: Map<ContractAddress, Map<u32, ContractAddress>>, 
         user_token_count: Map<ContractAddress, u32>, 
-        payrous_class_hash: felt252;
+        payrous_class_hash: ClassHash,
     }
 
 
@@ -82,23 +75,22 @@ pub mod Payrous_factory {
 
     #[constructor]
     fn constructor(ref self: ContractState, _owner: ContractAddress, _payrous_class_hash: felt252) {
+        let payrous_hash: ClassHash = _payrous_class_hash.try_into().unwrap();
         self.owner.write(_owner);
-        self.payrous_class_hash.write(_payrous_class_hash);
+        self.payrous_class_hash.write(payrous_hash);
     }
 
 
     #[abi(embed_v0)]
-    impl Payrous_factoryImpl of super::Ipayrous_factory<ContractState> {
+    impl PayrousFactoryImpl of super::IPayrousFactory<ContractState> {
 
         fn deploy_payrous( ref self: ContractState,  organization_name: felt252, token_address: ContractAddress, owner: ContractAddress, platform_fee_recipient: ContractAddress) {
-            let contract_address = self._deploy_payrous(organization_name, token_address, owner, platform_fee_recipient, payrous_class_hash);
+            let contract_address = self._deploy_payrous(organization_name, token_address, owner, platform_fee_recipient, self.payrous_class_hash.read());
             self.all_deployed_address.entry(self.total_deployed_contract.read()).write(contract_address);
-
-            let contract_info = self.get_contract_info(contract_address);
 
             let _contract_details = ContractInfo {
                 contract_address: contract_address,
-                deployment_time: constants::block_timestamp(),
+                deployment_time: get_block_timestamp(),
                 deployer: owner,
                 contract_index: self.total_deployed_contract.read().into() 
             };
@@ -115,7 +107,7 @@ pub mod Payrous_factory {
             self.user_token_count.entry(owner).write(count + 1);
         }
 
-        fn upgrade_class_hash(ref self: ContractState, new_class_hash: felt252) {
+        fn upgrade_class_hash(ref self: ContractState, new_class_hash: ClassHash) {
             assert!(self.get_owner() == get_caller_address(), "Only owner can upgrade the class hash");
             self.payrous_class_hash.write(new_class_hash);
         }
@@ -132,7 +124,7 @@ pub mod Payrous_factory {
 
                 all_deployed.append(self.all_deployed_address.entry(i).read());
                 i += 1;
-            }
+            };
             all_deployed
         }
 
@@ -149,7 +141,7 @@ pub mod Payrous_factory {
 
                 all_deployed.append(self.user_deployed_tokens.entry(user_address).entry(i).read());
                 i += 1;
-            }
+            };
             all_deployed
         }
 
@@ -165,7 +157,7 @@ pub mod Payrous_factory {
             self.contract_info.entry(contract_address).read()
         }
 
-        fn get_class_hash(self: @ContractState) -> felt252 {
+        fn get_class_hash(self: @ContractState) -> ClassHash {
             self.payrous_class_hash.read()
         }
     }
@@ -179,11 +171,16 @@ pub mod Payrous_factory {
             token_address: ContractAddress,
             owner: ContractAddress, 
             platform_fee_recipient: ContractAddress, 
-            payrous_class_hash: felt252
+            payrous_class_hash: ClassHash
         ) -> ContractAddress {
             let payrous_hash: ClassHash = payrous_class_hash.try_into().unwrap();
 
-            let call_data: Array<felt252> = array![organization_name,token_address,owner,platform_fee_recipient];
+            // let call_data: Array<felt252> = array![organization_name,token_address.into(),owner.into(),platform_fee_recipient.into()];
+            let call_data: Array<felt252> = array![];
+
+            // I REACH HERE
+
+            
             
             let (contract_address, _) = deploy_syscall(
                 payrous_hash.try_into().unwrap(),
@@ -192,7 +189,7 @@ pub mod Payrous_factory {
                 false
             ).unwrap();
 
-            IpayrousDispatcher{contract_address: contract_address}.initialize(org_name, token_address, owner, platform_fee_recipient);
+            IPayrousDispatcher{contract_address: contract_address}.initialize(organization_name, token_address, owner, platform_fee_recipient);
 
             contract_address
         }
