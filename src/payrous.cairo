@@ -24,6 +24,7 @@ pub trait IPayrous<TContractState> {
     fn get_employee_balance(self: @TContractState, employee: ContractAddress) -> u256;
     fn get_contract_balance(self: @TContractState) -> u256;
     fn get_full_details(self: @TContractState) -> (OrganizationDetails, Array<ContractAddress>, Array<u256>);
+    fn get_owner(self: @TContractState) -> ContractAddress;
 }
 
 #[starknet::interface]
@@ -260,7 +261,7 @@ mod Payrous {
                 token.transfer(recipient, amount);
                 
                 // Emit event
-                self.emit(ERC20Transfer { token_address: current_details.token_address, sender: get_caller_address(), to: recipient, amount: amount });  
+                // self.emit(ERC20Transfer { token_address: current_details.token_address, sender: get_caller_address(), to: recipient, amount: amount });  
                 i += 1;
             };
             
@@ -367,6 +368,10 @@ mod Payrous {
                 i += 1;
             };
             employees
+        }
+
+        fn get_owner(self: @ContractState) -> ContractAddress {
+            self.owner.read()
         }
 
 

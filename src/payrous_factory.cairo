@@ -20,7 +20,7 @@ pub trait IPayrousFactory<TContractState> {
         token_address: ContractAddress, 
         owner: ContractAddress, 
         platform_fee_recipient: ContractAddress,
-    );
+    ) -> ContractAddress;
     fn upgrade_class_hash(ref self: TContractState, new_class_hash: ClassHash);
 
 }
@@ -84,7 +84,7 @@ pub mod PayrousFactory {
     #[abi(embed_v0)]
     impl PayrousFactoryImpl of super::IPayrousFactory<ContractState> {
 
-        fn deploy_payrous( ref self: ContractState,  organization_name: felt252, token_address: ContractAddress, owner: ContractAddress, platform_fee_recipient: ContractAddress) {
+        fn deploy_payrous( ref self: ContractState,  organization_name: felt252, token_address: ContractAddress, owner: ContractAddress, platform_fee_recipient: ContractAddress) -> ContractAddress {
             let contract_address = self._deploy_payrous(organization_name, token_address, owner, platform_fee_recipient, self.payrous_class_hash.read());
             self.all_deployed_address.entry(self.total_deployed_contract.read()).write(contract_address);
 
@@ -105,6 +105,8 @@ pub mod PayrousFactory {
 
             self.user_deployed_tokens.entry(owner).entry(count).write(token_address);
             self.user_token_count.entry(owner).write(count + 1);
+
+            contract_address
         }
 
         fn upgrade_class_hash(ref self: ContractState, new_class_hash: ClassHash) {
@@ -177,10 +179,6 @@ pub mod PayrousFactory {
 
             // let call_data: Array<felt252> = array![organization_name,token_address.into(),owner.into(),platform_fee_recipient.into()];
             let call_data: Array<felt252> = array![];
-
-            // I REACH HERE
-
-            
             
             let (contract_address, _) = deploy_syscall(
                 payrous_hash.try_into().unwrap(),

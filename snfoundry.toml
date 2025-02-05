@@ -13,15 +13,15 @@
 
 [sncast.argent_sep]
 account = "argent_sep"
-# accounts-file = "/Users/0xblackadam/.starknet_accounts/starknet_open_zeppelin_accounts.json"
+accounts-file = "/Users/0xblackadam/.starknet_accounts/starknet_open_zeppelin_accounts.json"
 url = "https://starknet-sepolia.infura.io/v3/5fa8c7f25ba14055af923d320660e952"
 
 [sncast.katana_sep]
 account = "katana_sep"
-# accounts-file = "/Users/0xblackadam/.starknet_accounts/starknet_open_zeppelin_accounts.json"
+accounts-file = "/Users/0xblackadam/.starknet_accounts/starknet_open_zeppelin_accounts.json"
 url = "http://127.0.0.1:5050"
 
 [sncast.katana_1]
 account = "katana_1"
-# accounts-file = "/Users/0xblackadam/.starknet_accounts/starknet_open_zeppelin_accounts.json"
+accounts-file = "/Users/0xblackadam/.starknet_accounts/starknet_open_zeppelin_accounts.json"
 url = "http://127.0.0.1:5050"
