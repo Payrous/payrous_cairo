@@ -179,7 +179,7 @@ fn test_pay_multiple_users() {
 
     let mut i: u64 = 1;
 
-    while i < 501 {
+    while i < 701 {
         let mut b: felt252 = i.into();
 
         // let user_address = contract_address_const::<b>();
@@ -193,7 +193,7 @@ fn test_pay_multiple_users() {
 
     let mut j: u64 = 0;
     
-    while j < 500 {
+    while j < 700 {
         amount_to_be_paid_array.append(amount_to_be_paid);
         j += 1;
     };
@@ -250,9 +250,20 @@ fn test_pay_multiple_users() {
     println!("We don reach here 3");
 
     let all_users = payrous_dispatcher.get_all_employee_address();
-    assert(all_users.len() == 500, 'Invalid number of users');  
+    assert(all_users.len() == 700, 'Invalid number of users');  
 
     println!("We don reach here 4");
+
+
+    println!("balance of owner");
+    println!("{}", erc20_dispatcher.balance_of(payrous_contract_address));
+
+
+    // println!("balance of a recipient");
+    // println!("{}", erc20_dispatcher.balance_of(*user_addresses[0]));
+
+
+
 }
 
 
