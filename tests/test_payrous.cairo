@@ -179,7 +179,7 @@ fn test_pay_multiple_users() {
 
     let mut i: u64 = 1;
 
-    while i < 701 {
+    while i < 1001 {
         let mut b: felt252 = i.into();
 
         // let user_address = contract_address_const::<b>();
@@ -193,7 +193,7 @@ fn test_pay_multiple_users() {
 
     let mut j: u64 = 0;
     
-    while j < 700 {
+    while j < 1000 {
         amount_to_be_paid_array.append(amount_to_be_paid);
         j += 1;
     };
@@ -250,7 +250,7 @@ fn test_pay_multiple_users() {
     println!("We don reach here 3");
 
     let all_users = payrous_dispatcher.get_all_employee_address();
-    assert(all_users.len() == 700, 'Invalid number of users');  
+    assert(all_users.len() == 1000, 'Invalid number of users');  
 
     println!("We don reach here 4");
 
