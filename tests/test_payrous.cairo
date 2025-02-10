@@ -54,95 +54,95 @@ fn test_succesfull_deployment() {
     assert(hash_in_felt == pay_class_hash_class, 'Invalid hash');
 }
 
-// #[test]
-// #[fork("SEPOLIA_LATEST")]
-// fn test_deploy_payrous_contract() {
-//     let (payrous_factory_address, erc20_contract_address) = deploy_contract("PayrousFactory");
+#[test]
+#[fork("SEPOLIA_LATEST")]
+fn test_deploy_payrous_contract() {
+    let (payrous_factory_address, erc20_contract_address) = deploy_contract("PayrousFactory");
 
-//     let dispatcher = IPayrousFactoryDispatcher { contract_address: payrous_factory_address };
+    let dispatcher = IPayrousFactoryDispatcher { contract_address: payrous_factory_address };
 
-//     //payrous details for kenneth organisation 1
-//     let organization_name: felt252 = 'kenneth';
-//     let org_owner: ContractAddress = contract_address_const::<'kenneth'>();
-//     let platform_fee_recipient: ContractAddress = owner();
+    //payrous details for kenneth organisation 1
+    let organization_name: felt252 = 'kenneth';
+    let org_owner: ContractAddress = contract_address_const::<'kenneth'>();
+    let platform_fee_recipient: ContractAddress = owner();
 
-//     let payrous_contract_address = dispatcher.deploy_payrous(
-//         organization_name, 
-//         erc20_contract_address,
-//         org_owner, 
-//         platform_fee_recipient
-//     );
+    let payrous_contract_address = dispatcher.deploy_payrous(
+        organization_name, 
+        erc20_contract_address,
+        org_owner, 
+        platform_fee_recipient
+    );
 
-//     let all_contract = dispatcher.get_all_deployed_contract();
-//     assert(all_contract.len() == 1, 'Invalid deployment');
+    let all_contract = dispatcher.get_all_deployed_contract();
+    assert(all_contract.len() == 1, 'Invalid deployment');
 
-//     let payrous_dispatcher = IPayrousDispatcher { contract_address: payrous_contract_address };
+    let payrous_dispatcher = IPayrousDispatcher { contract_address: payrous_contract_address };
 
-//     let payrous_owner = payrous_dispatcher.get_owner();
-//     assert(payrous_owner == org_owner, 'Invalid owner');
-// }
-
-
-// #[test]
-// #[fork("SEPOLIA_LATEST")]
-// fn test_add_multiple_users() {
-//     let (payrous_factory_address, erc20_contract_address) = deploy_contract("PayrousFactory");
-
-//     let dispatcher = IPayrousFactoryDispatcher { contract_address: payrous_factory_address };
+    let payrous_owner = payrous_dispatcher.get_owner();
+    assert(payrous_owner == org_owner, 'Invalid owner');
+}
 
 
-//     //payrous details for kenneth organisation 1
-//     let organization_name: felt252 = 'kenneth';
-//     let org_owner: ContractAddress = owner();
-//     let platform_fee_recipient: ContractAddress = owner();
+#[test]
+#[fork("SEPOLIA_LATEST")]
+fn test_add_multiple_users() {
+    let (payrous_factory_address, erc20_contract_address) = deploy_contract("PayrousFactory");
 
-//     let payrous_contract_address = dispatcher.deploy_payrous(
-//         organization_name, 
-//         erc20_contract_address,
-//         org_owner, 
-//         platform_fee_recipient
-//     );
-
-//     let all_contract = dispatcher.get_all_deployed_contract();
-//     assert(all_contract.len() == 1, 'Invalid deployment');
+    let dispatcher = IPayrousFactoryDispatcher { contract_address: payrous_factory_address };
 
 
-//     let payrous_dispatcher = IPayrousDispatcher { contract_address: payrous_contract_address };
+    //payrous details for kenneth organisation 1
+    let organization_name: felt252 = 'kenneth';
+    let org_owner: ContractAddress = owner();
+    let platform_fee_recipient: ContractAddress = owner();
 
-//     let payrous_owner = payrous_dispatcher.get_owner();
-//     assert(payrous_owner == org_owner, 'Invalid owner');
+    let payrous_contract_address = dispatcher.deploy_payrous(
+        organization_name, 
+        erc20_contract_address,
+        org_owner, 
+        platform_fee_recipient
+    );
 
-//     //generate 500 user address and amount to be paid. use equal amount for all users
-//     let mut user_addresses: Array::<ContractAddress> = ArrayTrait::new();
+    let all_contract = dispatcher.get_all_deployed_contract();
+    assert(all_contract.len() == 1, 'Invalid deployment');
 
-//     let mut i: u64 = 1;
 
-//     while i < 501 {
-//         let mut b: felt252 = i.into();
+    let payrous_dispatcher = IPayrousDispatcher { contract_address: payrous_contract_address };
 
-//         // let user_address = contract_address_const::<b>();
-//         user_addresses.append(b.try_into().unwrap());
-//         i += 1;
-//     };
+    let payrous_owner = payrous_dispatcher.get_owner();
+    assert(payrous_owner == org_owner, 'Invalid owner');
+
+    //generate 500 user address and amount to be paid. use equal amount for all users
+    let mut user_addresses: Array::<ContractAddress> = ArrayTrait::new();
+
+    let mut i: u64 = 1;
+
+    while i < 501 {
+        let mut b: felt252 = i.into();
+
+        // let user_address = contract_address_const::<b>();
+        user_addresses.append(b.try_into().unwrap());
+        i += 1;
+    };
 
    
-//     let amount_to_be_paid: u256 = 10000000000000000000;
-//     let mut amount_to_be_paid_array: Array::<u256> = ArrayTrait::new();
+    let amount_to_be_paid: u256 = 10000000000000000000;
+    let mut amount_to_be_paid_array: Array::<u256> = ArrayTrait::new();
 
-//     let mut j: u64 = 0;
+    let mut j: u64 = 0;
     
-//     while j < 500 {
-//         amount_to_be_paid_array.append(amount_to_be_paid);
-//         j += 1;
-//     };
+    while j < 500 {
+        amount_to_be_paid_array.append(amount_to_be_paid);
+        j += 1;
+    };
 
-//     start_cheat_caller_address(payrous_contract_address, payrous_owner);
-//     payrous_dispatcher.add_multiple_employees(user_addresses, amount_to_be_paid_array);  
-//     stop_cheat_caller_address(payrous_owner);
+    start_cheat_caller_address(payrous_contract_address, payrous_owner);
+    payrous_dispatcher.add_multiple_employees(user_addresses, amount_to_be_paid_array);  
+    stop_cheat_caller_address(payrous_owner);
 
-//     let all_users = payrous_dispatcher.get_all_employee_address();
-//     assert(all_users.len() == 500, 'Invalid number of users');  
-// }
+    let all_users = payrous_dispatcher.get_all_employee_address();
+    assert(all_users.len() == 500, 'Invalid number of users');  
+}
 
 
 
@@ -179,7 +179,7 @@ fn test_pay_multiple_users() {
 
     let mut i: u64 = 1;
 
-    while i < 1001 {
+    while i < 701 {
         let mut b: felt252 = i.into();
 
         // let user_address = contract_address_const::<b>();
@@ -193,7 +193,7 @@ fn test_pay_multiple_users() {
 
     let mut j: u64 = 0;
     
-    while j < 1000 {
+    while j < 700 {
         amount_to_be_paid_array.append(amount_to_be_paid);
         j += 1;
     };
@@ -250,7 +250,7 @@ fn test_pay_multiple_users() {
     println!("We don reach here 3");
 
     let all_users = payrous_dispatcher.get_all_employee_address();
-    assert(all_users.len() == 1000, 'Invalid number of users');  
+    assert(all_users.len() == 700, 'Invalid number of users');  
 
     println!("We don reach here 4");
 

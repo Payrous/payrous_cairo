@@ -1,0 +1,2 @@
+// implement the fee structure to the bulk payment
+// research on vunerablitiy with fee calculation(overflow/precison loss)
